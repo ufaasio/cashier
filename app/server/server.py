@@ -37,8 +37,9 @@ app = fastapi.FastAPI(
         "name": "MIT License",
         "url": "https://github.com/mahdikiani/FastAPILaunchpad/blob/main/LICENSE",
     },
-    docs_url=f"{config.Settings.base_path}/docs",
     openapi_url=f"{config.Settings.base_path}/openapi.json",
+    docs_url=f"{config.Settings.base_path}/docs",
+    redoc_url=f"{config.Settings.base_path}/redoc",
     lifespan=lifespan,
 )
 
@@ -105,13 +106,9 @@ app.add_middleware(
 
 app.add_middleware(middlewares.OriginalHostMiddleware)
 
-from apps.business.routes import router as business_router
-from apps.ipg.routes import router as ipg_router
+from apps.payment.routes import router as payment_router
 
-app.include_router(
-    business_router, prefix=f"{config.Settings.base_path}", include_in_schema=False
-)
-app.include_router(ipg_router, prefix=f"{config.Settings.base_path}")
+app.include_router(payment_router, prefix=f"{config.Settings.base_path}")
 
 
 @app.get(f"{config.Settings.base_path}/health")

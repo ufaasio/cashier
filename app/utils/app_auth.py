@@ -3,9 +3,8 @@ import hmac
 from datetime import datetime
 
 from aiocache import cached
+from fastapi_mongo_base._utils.aionetwork import aio_request
 from pydantic import BaseModel, field_validator
-
-from .aionetwork import aio_request
 
 
 class AppAuth(BaseModel):
