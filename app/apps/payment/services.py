@@ -2,11 +2,12 @@ import logging
 import uuid
 from decimal import Decimal
 
-from apps.config.models import Configuration
 from fastapi_mongo_base.core.exceptions import BaseHTTPException
 from fastapi_mongo_base.utils import aionetwork
-from server.config import Settings
 from ufaas_fastapi_business.models import Business
+
+from apps.config.models import Configuration
+from server.config import Settings
 
 from .models import Payment
 from .schemas import (
@@ -85,6 +86,10 @@ async def start_payment(
     callback_url = (
         f"https://{business.domain}{Settings.base_path}/payments/{payment.uid}/verify"
     )
+
+    if amount == 0:
+        return {"status": True, "uid": payment.uid, "url": callback_url}
+
     headers = {"Authorization": f"Bearer {await business.get_access_token()}"}
     ipg_schema = IPGPurchaseSchema(
         user_id=user_id,
@@ -118,6 +123,9 @@ async def verify_payment(business: Business, payment: Payment, **kwargs) -> Paym
     # if payment.status in ["SUCCESS", "FAILED"]:
     #     return payment
 
+    if payment.amount == 0:
+        await payment.success_purchase(None)
+
     for try_ in payment.tries:
         if try_.status.is_open():
             url = f"{purchase_business_url(business, try_.ipg)}{try_.uid}"
@@ -149,6 +157,10 @@ async def create_proposal(payment: Payment) -> dict:
     config: Configuration = await Configuration.get_config(business.name)
 
     wallets = await get_wallets(business, payment.user_id)
+
+    if payment.amount == 0:
+        return
+
     logging.info(f"{wallets=}")
     for wallet_ in wallets:
         if wallet_.uid == payment.wallet_id:
@@ -206,3 +218,4 @@ async def create_proposal(payment: Payment) -> dict:
         logging.error(f"Error in create_proposal {response}")
         # raise PayPingException(f"Error in create_proposal {response}")
     return response
+

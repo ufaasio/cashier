@@ -5,10 +5,11 @@ import uuid
 import httpx
 import json_advanced as json
 import pytest
+from ufaas_fastapi_business.models import Business
+
 from apps.payment.models import Payment
 from apps.payment.services import get_wallets, payments_options
 from tests.constants import StaticData
-from ufaas_fastapi_business.models import Business
 
 uid = lambda i: uuid.UUID(f"{i:032}")
 

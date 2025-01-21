@@ -1,6 +1,7 @@
+from fastapi_mongo_base.core import app_factory
+
 from apps.config.routes import router as config_router
 from apps.payment.routes import router as payment_router
-from fastapi_mongo_base.core import app_factory
 
 from . import config
 

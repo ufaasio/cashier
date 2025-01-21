@@ -37,7 +37,7 @@ class PaymentRouter(AbstractAuthRouter[Payment, PaymentSchema]):
         self.retrieve_response_schema = PaymentRetrieveSchema
 
     def config_routes(self, **kwargs):
-        super().config_routes(delete_route=False, **kwargs)
+        super().config_routes(update_route=False,delete_route=False, **kwargs)
         self.router.add_api_route(
             "/start",
             self.start_direct_payment,
@@ -65,7 +65,6 @@ class PaymentRouter(AbstractAuthRouter[Payment, PaymentSchema]):
 
     async def retrieve_item(self, request: Request, uid: uuid.UUID):
         auth = await self.get_auth(request)
-        logging.info(f"retrieve_item: {uid=}, {auth=}")
         item = await self.get_item(uid, business_name=auth.business.name)
         if auth.user_id:
             wallets = await get_wallets(auth.business, auth.user_id)
@@ -98,8 +97,9 @@ class PaymentRouter(AbstractAuthRouter[Payment, PaymentSchema]):
 
         # return await super().create_item(request, item.model_dump())
 
-    async def update_item(self, request: Request, data: PaymentUpdateSchema):
-
+    async def update_item(
+        self, request: Request, uid: uuid.UUID, data: PaymentUpdateSchema
+    ):
         raise NotImplementedError
 
     async def start_direct_payment(

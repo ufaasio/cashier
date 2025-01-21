@@ -6,7 +6,7 @@ from typing import Any, Literal
 
 from fastapi_mongo_base.schemas import BaseEntitySchema, BusinessOwnedEntitySchema
 from fastapi_mongo_base.utils import bsontools, texttools
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from ufaas_fastapi_business.core.enums import Currency
 
 
@@ -61,8 +61,8 @@ class IPGPurchaseSchema(BaseModel):
 
 
 class PaymentCreateSchema(BaseModel):
-    user_id: uuid.UUID | None = None
-    wallet_id: uuid.UUID | None = None
+    user_id: uuid.UUID  # | None = None
+    wallet_id: uuid.UUID  # | None = None
     basket_id: uuid.UUID | None = None
     amount: Decimal
     currency: Currency = Currency.IRR
@@ -98,20 +98,35 @@ class PaymentUpdateSchema(BaseModel):
     voucher_code: str | None = None
 
 
+
+
 class PaymentSchema(PaymentCreateSchema, BusinessOwnedEntitySchema):
     status: PaymentStatus = PaymentStatus.INIT
     tries: list[PurchaseSchema] = []
     verified_at: datetime | None = None
+
+    original_amount: Decimal = Field(
+        default=Decimal(0), gt=0, description="Original amount"
+    )
 
     duration: int = 60 * 60  # in seconds
 
     def is_overdue(self):
         return self.created_at + timedelta(self.duration) < datetime.now()
 
-    @classmethod
     @field_validator("amount", mode="before")
     def validate_amount(cls, value):
         return bsontools.decimal_amount(value)
+
+    @field_validator("original_amount", mode="before")
+    def validate_original_amount(cls, value):
+        return bsontools.decimal_amount(value)
+
+    @model_validator(mode="before")
+    def validate_null_original_amount(cls, values: dict):
+        if not values.get("original_amount"):
+            values["original_amount"] = values["amount"]
+        return values
 
 
 class PaymentRetrieveSchema(PaymentSchema):
