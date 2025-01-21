@@ -2,18 +2,21 @@ import logging
 import uuid
 from decimal import Decimal
 
-from core.exceptions import BaseHTTPException
 from fastapi import Request
 from fastapi.responses import RedirectResponse
+from fastapi_mongo_base.core.exceptions import BaseHTTPException
+from fastapi_mongo_base.utils import basic
 from ufaas_fastapi_business.middlewares import authorization_middleware, get_business
 from ufaas_fastapi_business.routes import AbstractAuthRouter
 
+from ..config.models import Configuration
 from .models import Payment
 from .schemas import (
     PaymentCreateSchema,
     PaymentRetrieveSchema,
     PaymentSchema,
     PaymentStatus,
+    PaymentUpdateSchema,
 )
 from .services import (
     create_proposal,
@@ -33,28 +36,8 @@ class PaymentRouter(AbstractAuthRouter[Payment, PaymentSchema]):
         self.create_request_schema = PaymentCreateSchema
         self.retrieve_response_schema = PaymentRetrieveSchema
 
-    def config_routes(self):
-        self.router.add_api_route(
-            "/",
-            self.list_items,
-            methods=["GET"],
-            response_model=self.list_response_schema,
-            status_code=200,
-        )
-        self.router.add_api_route(
-            "/{uid:uuid}",
-            self.retrieve_item,
-            methods=["GET"],
-            response_model=self.retrieve_response_schema,
-            status_code=200,
-        )
-        self.router.add_api_route(
-            "/",
-            self.create_item,
-            methods=["POST"],
-            response_model=self.create_response_schema,
-            status_code=201,
-        )
+    def config_routes(self, **kwargs):
+        super().config_routes(delete_route=False, **kwargs)
         self.router.add_api_route(
             "/start",
             self.start_direct_payment,
@@ -64,7 +47,7 @@ class PaymentRouter(AbstractAuthRouter[Payment, PaymentSchema]):
         self.router.add_api_route(
             "/{uid:uuid}/start",
             self.start_payment,
-            methods=["GET"],
+            methods=["GET", "POST"],
             # response_model=self.retrieve_response_schema,
         )
         self.router.add_api_route(
@@ -93,18 +76,31 @@ class PaymentRouter(AbstractAuthRouter[Payment, PaymentSchema]):
             **item.model_dump(), ipgs=options, wallets=wallets
         )
 
-    async def create_item(self, request: Request, item: PaymentCreateSchema):
+    async def create_item(self, request: Request, data: PaymentCreateSchema):
         auth = await self.get_auth(request)
 
-        item = self.model(
+        if not "currency" in data.model_fields_set:
+            data.currency = auth.business.config.default_currency
+
+        if not data.available_ipgs:
+            configuration: Configuration = await Configuration.get_config(
+                auth.business.name
+            )
+            data.available_ipgs = configuration.ipgs
+
+        item = Payment(
             business_name=auth.business.name,
             user_id=auth.user_id,
-            **item.model_dump(),
+            **data.model_dump(exclude=["user_id"]),
         )
         await item.save()
-        return self.create_response_schema(**item.model_dump())
+        return item
 
         # return await super().create_item(request, item.model_dump())
+
+    async def update_item(self, request: Request, data: PaymentUpdateSchema):
+
+        raise NotImplementedError
 
     async def start_direct_payment(
         self,
@@ -131,10 +127,15 @@ class PaymentRouter(AbstractAuthRouter[Payment, PaymentSchema]):
         return await self.start_payment(request, payment.uid)
 
     async def start_payment(
-        self, request: Request, uid: uuid.UUID, ipg: str, amount: Decimal = None
+        self, request: Request, uid: uuid.UUID, ipg: str = None, amount: Decimal = None
     ):
         auth = await self.get_auth(request)
         item: Payment = await self.get_item(uid, business_name=auth.business.name)
+
+        logging.info(f"{auth.user_id=} {item.user_id=}")
+
+        if ipg is None:
+            ipg = item.available_ipgs[0]
 
         start_data = await start_payment(
             payment=item,
@@ -142,12 +143,16 @@ class PaymentRouter(AbstractAuthRouter[Payment, PaymentSchema]):
             ipg=ipg,
             amount=amount,
             user_id=auth.user_id,
+            phone=auth.user.phone if auth.user else None,
         )
 
         if start_data["status"]:
-            return RedirectResponse(url=start_data["url"])
-        else:
-            raise BaseHTTPException(status_code=400, detail=start_data["message"])
+            if request.method == "GET":
+                return RedirectResponse(url=start_data["url"])
+            else:
+                return {"redirect_url": start_data["url"]}
+
+        raise BaseHTTPException(status_code=400, **start_data)
 
     from pydantic import BaseModel
 
@@ -158,32 +163,32 @@ class PaymentRouter(AbstractAuthRouter[Payment, PaymentSchema]):
         cardnumber: str | None = None
         cardhashpan: str | None = None
 
+    @basic.try_except_wrapper
     async def verify_payment(
         self,
         request: Request,
         uid: uuid.UUID,
     ):
-        logging.info(f"verify_payment: {uid=} {request.method=}")
-        try:
-            business = await get_business(request)
+        business = await get_business(request)
 
-            item: Payment = await self.get_item(uid, business_name=business.name)
-            if item.status != PaymentStatus.PENDING:
-                return RedirectResponse(url=item.callback_url, status_code=303)
+        item: Payment = await self.get_item(uid, business_name=business.name)
+        payment_status = item.status
 
-            payment: Payment = await verify_payment(business=business, item=item)
+        payment: Payment = await verify_payment(business=business, payment=item)
 
-            if payment.status == PaymentStatus.SUCCESS:
-                await create_proposal(payment, business)
-                # pass
+        if payment.status == PaymentStatus.PENDING:
+            # return proper response
+            return payment
+        if payment.status == PaymentStatus.SUCCESS:
+            if payment_status == PaymentStatus.PENDING:
+                await create_proposal(payment)
+            else:
+                logging.info(f"payment was not pending {payment_status=}")
 
-            return RedirectResponse(
-                url=f"{payment.callback_url}?success={payment.is_successful}",
-                status_code=303,
-            )
-        except Exception as e:
-            logging.error(f"verify error: {e}")
-            raise e
+        return RedirectResponse(
+            url=f"{payment.callback_url}?success={payment.is_successful}",
+            status_code=303,
+        )
 
 
 router = PaymentRouter().router

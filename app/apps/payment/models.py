@@ -1,16 +1,13 @@
 from datetime import datetime
 
-from fastapi_mongo_base._utils import bsontools
 from fastapi_mongo_base.models import BusinessOwnedEntity
+from fastapi_mongo_base.utils import bsontools
 from pydantic import field_serializer, field_validator
 
 from .schemas import PaymentSchema, PaymentStatus
 
 
 class Payment(PaymentSchema, BusinessOwnedEntity):
-    description: str
-    callback_url: str
-
     class Settings:
         indexes = BusinessOwnedEntity.Settings.indexes
 
