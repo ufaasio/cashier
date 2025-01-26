@@ -89,7 +89,8 @@ class PaymentCreateSchema(BaseModel):
 
     @field_validator("callback_url", mode="before")
     def validate_callback_url(cls, value):
-        if not texttools.is_valid_url(value):
+        from .services import is_valid_url
+        if not is_valid_url(value):
             raise ValueError(f"Invalid URL {value}")
         return value
 

@@ -37,7 +37,7 @@ class PaymentRouter(AbstractAuthRouter[Payment, PaymentSchema]):
         self.retrieve_response_schema = PaymentRetrieveSchema
 
     def config_routes(self, **kwargs):
-        super().config_routes(update_route=False,delete_route=False, **kwargs)
+        super().config_routes(update_route=False, delete_route=False, **kwargs)
         self.router.add_api_route(
             "/start",
             self.start_direct_payment,
@@ -176,7 +176,11 @@ class PaymentRouter(AbstractAuthRouter[Payment, PaymentSchema]):
 
         payment: Payment = await verify_payment(business=business, payment=item)
 
+        payment_redirect_url = (
+            f"{payment.callback_url}?payment_id={payment.uid}&status={payment.status.value}"
+        )
         if payment.status == PaymentStatus.PENDING:
+            return RedirectResponse(url=payment_redirect_url, status_code=303)
             # return proper response
             return payment
         if payment.status == PaymentStatus.SUCCESS:
@@ -185,10 +189,7 @@ class PaymentRouter(AbstractAuthRouter[Payment, PaymentSchema]):
             else:
                 logging.info(f"payment was not pending {payment_status=}")
 
-        return RedirectResponse(
-            url=f"{payment.callback_url}?success={payment.is_successful}",
-            status_code=303,
-        )
+        return RedirectResponse(url=payment_redirect_url, status_code=303)
 
 
 router = PaymentRouter().router

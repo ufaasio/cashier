@@ -18,7 +18,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.${PROJECT_NAME}.entrypoints=web"
       - "traefik.http.routers.${PROJECT_NAME}.rule=Host(`${DOMAIN}`)"
-      # - "traefik.http.routers.${PROJECT_NAME}.middlewares=https-redirect"
+      - "traefik.http.routers.${PROJECT_NAME}.middlewares=https-redirect"
       - "traefik.http.routers.${PROJECT_NAME}-secure.entrypoints=websecure"
       - "traefik.http.routers.${PROJECT_NAME}-secure.rule=Host(`${DOMAIN}`)"
       - "traefik.http.routers.${PROJECT_NAME}-secure.tls=true"
