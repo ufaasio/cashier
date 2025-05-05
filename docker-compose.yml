@@ -14,6 +14,7 @@ services:
     networks:
       - traefik-net
       - mongo-net
+      - ufaas-net
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.${PROJECT_NAME}.entrypoints=web"
@@ -32,4 +33,6 @@ networks:
   traefik-net:
     external: true
   mongo-net:
+    external: true
+  ufaas-net:
     external: true

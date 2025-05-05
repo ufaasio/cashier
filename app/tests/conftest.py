@@ -57,7 +57,7 @@ async def client() -> AsyncGenerator[httpx.AsyncClient, None]:
     """Fixture to provide an AsyncClient for FastAPI app."""
 
     async with httpx.AsyncClient(
-        app=fastapi_app, base_url="http://test.ufaas.io"
+        app=fastapi_app, base_url="http://test.uln.me"
     ) as ac:
         yield ac
 
@@ -107,7 +107,7 @@ def enrollment_dicts():
 async def business(constants: StaticData):
     data = dict(
         name=StaticData.business_name_1,
-        domain="test.ufaas.io",
+        domain="test.uln.me",
         user_id=StaticData.user_id_1_1,
         uid=StaticData.business_id_1,
     )
@@ -120,7 +120,7 @@ async def business(constants: StaticData):
 async def access_token_business(business: Business):
     data = {"refresh_token": StaticData.refresh_token}
 
-    async with httpx.AsyncClient(base_url="https://sso.ufaas.io") as client:
+    async with httpx.AsyncClient(base_url="https://sso.uln.me") as client:
         response = await client.post("/auth/refresh", json=data)
         return response.json()["access_token"]
 
@@ -128,7 +128,7 @@ async def access_token_business(business: Business):
 @pytest_asyncio.fixture(scope="session")
 async def access_token_user(business: Business):
     data = {"refresh_token": StaticData.refresh_token_user}
-    async with httpx.AsyncClient(base_url="https://sso.ufaas.io") as client:
+    async with httpx.AsyncClient(base_url="https://sso.uln.me") as client:
         response = await client.post("/auth/refresh", json=data)
         return response.json()["access_token"]
 

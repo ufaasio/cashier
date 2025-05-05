@@ -106,9 +106,7 @@ class PaymentSchema(PaymentCreateSchema, BusinessOwnedEntitySchema):
     tries: list[PurchaseSchema] = []
     verified_at: datetime | None = None
 
-    original_amount: Decimal = Field(
-        default=Decimal(0), gt=0, description="Original amount"
-    )
+    original_amount: Decimal = 0
 
     duration: int = 60 * 60  # in seconds
 
